@@ -1,0 +1,151 @@
+openapi: 3.0.3
+info:
+  title: Gossips Security Service API
+  description: Authentication and Authorization Service
+  version: 1.0.0
+  contact:
+    name: Gossips Team
+    email: support@gossips.com
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+tags:
+  - name: SecurityController
+
+paths:
+  /api/auth/register:
+    post:
+      tags:
+        - SecurityController
+      summary: Register new user
+      description: Creates a new user account and returns JWT token
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '200':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          description: Invalid input
+        '409':
+          description: User already exists
+
+  /api/auth/login:
+    post:
+      tags:
+        - SecurityController
+      summary: Login user
+      description: Authenticates user and returns JWT token
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCredentials'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid credentials
+        '404':
+          description: User not found
+
+  /api/auth/refresh:
+    post:
+      tags:
+        - SecurityController
+      summary: Refresh token pair
+      description: Exchanges a valid refresh token for a new access + refresh token pair (rotation)
+      operationId: refreshTokens
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '200':
+          description: New token pair issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid, revoked or expired refresh token
+
+  /api/auth/logout:
+    post:
+      tags:
+        - SecurityController
+      summary: Logout
+      description: Revokes the given refresh token (access token expires on its own)
+      operationId: logout
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshTokenRequest'
+      responses:
+        '204':
+          description: Refresh token revoked
+        '401':
+          description: Invalid refresh token
+
+components:
+  schemas:
+    RefreshTokenRequest:
+      type: object
+      required:
+        - refreshToken
+      properties:
+        refreshToken:
+          type: string
+          description: Refresh token from login/register/refresh response
+          example: 8f3d2c1a9b4e4f6a8c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b
+    UserCredentials:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: Username
+          example: alex123
+        password:
+          type: string
+          description: Password
+          example: password123
+      description: User credentials for authentication
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token (short-lived)
+          example: eyJhbGciOiJIUzI1NiJ9...
+        refreshToken:
+          type: string
+          description: Refresh token (long-lived, revocable)
+          example: 8f3d2c1a9b4e4f6a8c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b
+        username:
+          type: string
+          description: Username
+          example: alex123
+      description: Authentication response with access and refresh tokens

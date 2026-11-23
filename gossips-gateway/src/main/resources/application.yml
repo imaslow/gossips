@@ -1,0 +1,16 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gossips-gateway
+
+gossips:
+  clients:
+    security: http://localhost:8081
+    app: http://localhost:8082
+  security:
+    jwt:
+      # Тот же секрет, что в security — gateway проверяет подпись локально.
+      # ОБЯЗАТЕЛЬНО переопределить через env JWT_SECRET в любом окружении выше локалки.
+      secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}

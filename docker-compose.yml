@@ -1,0 +1,72 @@
+# Весь стек gossips одной командой: docker compose up --build
+# Порты на хосте: gateway 8080, security 8081, app 8082, postgres 5434 (как у локального контейнера разработки).
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: gossips
+      POSTGRES_PASSWORD: gossips
+      POSTGRES_DB: gossips
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U gossips -d gossips" ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - gossips-pgdata:/var/lib/postgresql/data
+
+  security:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: gossips-security
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/gossips
+      DB_USER: gossips
+      DB_PASSWORD: gossips
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8081:8081"
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: gossips-app
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/gossips
+      DB_USER: gossips
+      DB_PASSWORD: gossips
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        MODULE: gossips-gateway
+    environment:
+      # Внутри compose соседи доступны по именам сервисов, не localhost.
+      GOSSIPS_CLIENTS_SECURITY: http://security:8081
+      GOSSIPS_CLIENTS_APP: http://app:8082
+      JWT_SECRET: ${JWT_SECRET:-dev-only-secret-change-me-0123456789abcdef}
+    depends_on:
+      - security
+      - app
+    ports:
+      - "8080:8080"
+
+volumes:
+  gossips-pgdata:
