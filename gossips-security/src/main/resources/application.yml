@@ -1,0 +1,24 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: gossips-security
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/gossips}
+    username: ${DB_USER:gossips}
+    password: ${DB_PASSWORD:gossips}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+gossips:
+  security:
+    jwt:
+      # HS256-секрет, общий для security (подпись) и gateway (проверка).
+      # ОБЯЗАТЕЛЬНО переопределить через env JWT_SECRET в любом окружении выше локалки.
+      # Минимум 32 символа.
+      secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+      # Время жизни access-токена (JWT)
+      access-expiration: ${JWT_ACCESS_EXPIRATION:15m}
+      # Время жизни refresh-токена (в БД, отзываемый)
+      refresh-expiration: ${JWT_REFRESH_EXPIRATION:7d}

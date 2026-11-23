@@ -1,0 +1,95 @@
+openapi: 3.0.3
+info:
+  title: Gossips App Service API
+  description: Main application service for messaging
+  version: 1.0.0
+  contact:
+    name: Gossips Team
+    email: support@gossips.com
+
+servers:
+  - url: http://localhost:8082
+    description: Local development server
+
+paths:
+  /api/messages:
+    get:
+      tags:
+        - Messages
+      summary: Get all messages
+      description: Retrieves all stored messages
+      operationId: getMessages
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Message'
+        '401':
+          description: Unauthorized
+
+    post:
+      tags:
+        - Messages
+      summary: Send a message
+      description: Creates a new message
+      operationId: sendMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+      responses:
+        '200':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Message'
+        '400':
+          description: Invalid message
+        '401':
+          description: Unauthorized
+
+components:
+  schemas:
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Message unique identifier
+          example: 550e8400-e29b-41d4-a716-446655440000
+        username:
+          type: string
+          description: Sender username
+          example: alex123
+        content:
+          type: string
+          description: Message content
+          example: Hello, World!
+        timestamp:
+          type: string
+          format: date-time
+          description: Message timestamp
+          example: 2024-01-15T10:30:00
+      description: Chat message
+
+    MessageRequest:
+      type: object
+      required:
+        - content
+      properties:
+        username:
+          type: string
+          description: Sender username
+          example: alex123
+        content:
+          type: string
+          description: Message content
+          example: Hello, World!
+      description: Message creation request

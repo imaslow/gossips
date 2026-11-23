@@ -1,0 +1,7 @@
+# Контекст сборки — корень репозитория, лишнее не тащим в образ.
+.git
+.idea
+**/target
+**/*.log
+docker-compose.yml
+docker

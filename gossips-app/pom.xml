@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.your.gossips</groupId>
+        <groupId>org.your.gossips</groupId>
         <artifactId>gossips</artifactId>
         <version>1.0.0</version>
     </parent>
@@ -17,7 +17,34 @@
     <name>Main Application</name>
     <description>Main application service</description>
 
+    <properties>
+        <jooq.version>3.21.5</jooq.version>
+    </properties>
+
     <dependencies>
+        <dependency>
+            <groupId>org.your.gossips</groupId>
+            <artifactId>common</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jooq</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
     </dependencies>
 
     <build>
@@ -25,6 +52,91 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>generate-app-api</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/../src/main/resources/openapi/app-api.yml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <apiPackage>org.your.gossips.gossipsapp.api</apiPackage>
+                            <modelPackage>org.your.gossips.common.dto</modelPackage>
+                            <generateModels>false</generateModels>
+                            <configOptions>
+                                <useTags>true</useTags>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useJakartaEe>true</useJakartaEe>
+                                <dateLibrary>java8</dateLibrary>
+                                <interfaceOnly>true</interfaceOnly>
+                                <openApiNullable>false</openApiNullable>
+                                <generateApiTests>false</generateApiTests>
+                                <generateModelTests>false</generateModelTests>
+                                <generateModelDocumentation>false</generateModelDocumentation>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jooq</groupId>
+                <artifactId>jooq-codegen-maven</artifactId>
+                <version>${jooq.version}</version>
+                <executions>
+                    <execution>
+                        <id>jooq-codegen</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <generator>
+                                <!-- Код генерируется из Flyway-миграций, живая БД на этапе сборки не нужна -->
+                                <database>
+                                    <name>org.jooq.meta.extensions.ddl.DDLDatabase</name>
+                                    <properties>
+                                        <property>
+                                            <key>scripts</key>
+                                            <value>${project.basedir}/src/main/resources/db/migration</value>
+                                        </property>
+                                        <property>
+                                            <key>sort</key>
+                                            <value>flyway</value>
+                                        </property>
+                                    </properties>
+                                    <includes>.*</includes>
+                                </database>
+                                <generate>
+                                    <deprecated>false</deprecated>
+                                    <records>true</records>
+                                    <pojos>false</pojos>
+                                    <daos>false</daos>
+                                </generate>
+                                <target>
+                                    <packageName>org.your.gossips.gossipsapp.jooq</packageName>
+                                    <directory>${project.build.directory}/generated-sources/jooq</directory>
+                                </target>
+                            </generator>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq-meta-extensions</artifactId>
+                        <version>${jooq.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.h2database</groupId>
+                        <artifactId>h2</artifactId>
+                        <version>2.3.232</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>

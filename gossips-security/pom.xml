@@ -6,7 +6,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.your.gossips</groupId>
+        <groupId>org.your.gossips</groupId>
         <artifactId>gossips</artifactId>
         <version>1.0.0</version>
     </parent>
@@ -17,29 +17,35 @@
     <name>Security Service</name>
     <description>Authentication and Authorization service</description>
 
+    <properties>
+        <jooq.version>3.21.5</jooq.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
 
-        <!-- JWT -->
+        <!-- PostgreSQL + jOOQ + Liquibase -->
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-api</artifactId>
-            <version>0.11.5</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jooq</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-impl</artifactId>
-            <version>0.11.5</version>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
         <dependency>
-            <groupId>io.jsonwebtoken</groupId>
-            <artifactId>jjwt-jackson</artifactId>
-            <version>0.11.5</version>
-            <scope>runtime</scope>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-liquibase</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.your.gossips</groupId>
+            <artifactId>common</artifactId>
+            <version>1.0.0</version>
         </dependency>
     </dependencies>
 
@@ -48,6 +54,138 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>generate-security-api</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/../src/main/resources/openapi/security-api.yml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <apiPackage>org.your.gossips.gossipssecurity.api</apiPackage>
+                            <modelPackage>org.your.gossips.common.dto</modelPackage>
+                            <generateModels>false</generateModels>
+                            <configOptions>
+                                <useTags>true</useTags>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useJakartaEe>true</useJakartaEe>
+                                <dateLibrary>java8</dateLibrary>
+                                <interfaceOnly>true</interfaceOnly>
+                                <openApiNullable>false</openApiNullable>
+                                <generateApiTests>false</generateApiTests>
+                                <generateModelTests>false</generateModelTests>
+                                <generateModelDocumentation>false</generateModelDocumentation>
+                            </configOptions>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <!-- Liquibase 5 офлайн всегда пишет историю в databasechangelog.csv в cwd
+                         (параметр changeLogHistoryFile убрали) — удаляем её перед каждым прогоном,
+                         иначе правка чейнджсета даст ошибку несовпадения контрольных сумм -->
+                    <execution>
+                        <id>clean-liquibase-offline-history</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <delete file="${maven.multiModuleProjectDirectory}/databasechangelog.csv" quiet="true"/>
+                                <delete file="${project.basedir}/databasechangelog.csv" quiet="true"/>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.liquibase</groupId>
+                <artifactId>liquibase-maven-plugin</artifactId>
+                <version>${liquibase.version}</version>
+                <executions>
+                    <!-- Liquibase 5 не умеет в jooq-meta-extensions (поддержку убрали),
+                         поэтому чейнджлог сначала превращаем в SQL для jOOQ codegen -->
+                    <execution>
+                        <id>generate-ddl-for-jooq</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>updateSQL</goal>
+                        </goals>
+                        <configuration>
+                            <changeLogFile>src/main/resources/db/changelog/db.changelog-master.xml</changeLogFile>
+                            <url>offline:postgresql</url>
+                            <migrationSqlOutputFile>${project.build.directory}/generated-resources/liquibase/schema.sql</migrationSqlOutputFile>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.yaml</groupId>
+                        <artifactId>snakeyaml</artifactId>
+                        <version>2.6</version>
+                    </dependency>
+                </dependencies>
+            </plugin>
+            <plugin>
+                <groupId>org.jooq</groupId>
+                <artifactId>jooq-codegen-maven</artifactId>
+                <version>${jooq.version}</version>
+                <executions>
+                    <execution>
+                        <id>jooq-codegen</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <generator>
+                                <!-- Код генерируется из SQL, который Liquibase разворачивает офлайн,
+                                     живая БД на этапе сборки не нужна -->
+                                <database>
+                                    <name>org.jooq.meta.extensions.ddl.DDLDatabase</name>
+                                    <properties>
+                                        <property>
+                                            <key>scripts</key>
+                                            <value>${project.build.directory}/generated-resources/liquibase/schema.sql</value>
+                                        </property>
+                                    </properties>
+                                    <includes>.*</includes>
+                                </database>
+                                <generate>
+                                    <deprecated>false</deprecated>
+                                    <records>true</records>
+                                    <pojos>false</pojos>
+                                    <daos>false</daos>
+                                </generate>
+                                <target>
+                                    <packageName>org.your.gossips.gossipssecurity.jooq</packageName>
+                                    <directory>${project.build.directory}/generated-sources/jooq</directory>
+                                </target>
+                            </generator>
+                        </configuration>
+                    </execution>
+                </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.jooq</groupId>
+                        <artifactId>jooq-meta-extensions</artifactId>
+                        <version>${jooq.version}</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>com.h2database</groupId>
+                        <artifactId>h2</artifactId>
+                        <version>2.3.232</version>
+                    </dependency>
+                </dependencies>
             </plugin>
         </plugins>
     </build>
