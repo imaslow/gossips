@@ -3,7 +3,7 @@ package org.your.gossips.gossipssecurity.adapter.out.persistence.impl;
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Repository;
-import org.your.gossips.gossipssecurity.adapter.out.persistence.StoredUser;
+import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredUser;
 import org.your.gossips.gossipssecurity.adapter.out.persistence.UserPersistence;
 import org.your.gossips.gossipssecurity.jooq.tables.records.UsersRecord;
 

@@ -48,6 +48,20 @@ public class JwtService {
         }
     }
 
+    /**
+     * Извлекает subject (username) из валидного токена.
+     * Вызывать только после {@link #isTokenValid(String)} — на невалидном токене бросит исключение.
+     */
+    public String extractUsername(String authorization) {
+        String token = stripBearer(authorization);
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .getSubject();
+    }
+
     private String stripBearer(String authorization) {
         return authorization != null && authorization.startsWith(BEARER_PREFIX)
                 ? authorization.substring(BEARER_PREFIX.length())

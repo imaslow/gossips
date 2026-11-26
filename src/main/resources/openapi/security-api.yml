@@ -125,10 +125,14 @@ components:
       properties:
         username:
           type: string
+          minLength: 3
+          maxLength: 64
           description: Username
           example: alex123
         password:
           type: string
+          minLength: 8
+          maxLength: 100
           description: Password
           example: password123
       description: User credentials for authentication

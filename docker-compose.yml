@@ -10,13 +10,16 @@ services:
       POSTGRES_DB: gossips
     ports:
       - "5434:5432"
+    volumes:
+      - gossips-pgdata:/var/lib/postgresql/data
+      # Первый старт контейнера (пустой volume): создаём БД для каждого сервиса,
+      # иначе два Flyway-сервиса на одной БД подерутся за flyway_schema_history.
+      - ./docker/init-databases.sh:/docker-entrypoint-initdb.d/init-databases.sh:ro
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U gossips -d gossips" ]
       interval: 5s
       timeout: 3s
       retries: 10
-    volumes:
-      - gossips-pgdata:/var/lib/postgresql/data
 
   security:
     build:
@@ -42,7 +45,7 @@ services:
       args:
         MODULE: gossips-app
     environment:
-      DB_URL: jdbc:postgresql://postgres:5432/gossips
+      DB_URL: jdbc:postgresql://postgres:5432/gossips_app
       DB_USER: gossips
       DB_PASSWORD: gossips
     depends_on:

@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.your.gossips.common.dto.AuthResponse;
 import org.your.gossips.common.dto.RefreshTokenRequest;
 import org.your.gossips.common.dto.UserCredentials;
-import org.your.gossips.gossipssecurity.adapter.out.persistence.StoredUser;
+import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredUser;
 import org.your.gossips.gossipssecurity.adapter.out.persistence.UserPersistence;
 import org.your.gossips.gossipssecurity.application.TokenService;
 import org.your.gossips.gossipssecurity.common.exception.UserAlreadyExistsException;

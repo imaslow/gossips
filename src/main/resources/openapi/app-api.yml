@@ -12,31 +12,118 @@ servers:
     description: Local development server
 
 paths:
-  /api/messages:
-    get:
+  /api/conversations:
+    post:
       tags:
-        - Messages
-      summary: Get all messages
-      description: Retrieves all stored messages
-      operationId: getMessages
+        - Conversations
+      summary: Create a 1-on-1 conversation
+      description: Creates (or returns existing) conversation between the caller and the given user. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: createConversation
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreateRequest'
       responses:
         '200':
-          description: Messages retrieved successfully
+          description: Conversation created or already existing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Invalid peer (self or malformed)
+
+    get:
+      tags:
+        - Conversations
+      summary: List caller's conversations
+      description: All 1-on-1 conversations of the caller, newest first
+      operationId: getConversations
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Conversations of the caller
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Message'
-        '401':
-          description: Unauthorized
+                  $ref: '#/components/schemas/Conversation'
+
+  /api/conversations/{conversationId}/messages:
+    get:
+      tags:
+        - Conversations
+      summary: Get conversation messages (paginated)
+      description: Cursor-paginated history of one conversation, newest first. Only conversation members.
+      operationId: getConversationMessages
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: beforeId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+          description: Cursor — message id; returns messages older than it
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+      responses:
+        '200':
+          description: Page of messages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessagesPage'
+        '403':
+          description: Not a conversation member
 
     post:
       tags:
-        - Messages
-      summary: Send a message
-      description: Creates a new message
-      operationId: sendMessage
+        - Conversations
+      summary: Send message to conversation
+      description: Author is taken from the X-Username header, not from the request body. Only conversation members.
+      operationId: sendConversationMessage
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -45,18 +132,502 @@ paths:
               $ref: '#/components/schemas/MessageRequest'
       responses:
         '200':
-          description: Message sent successfully
+          description: Message sent
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Message'
+        '403':
+          description: Not a conversation member
+
+  /api/contacts:
+    get:
+      tags:
+        - Contacts
+      summary: List caller's contacts
+      description: All contacts of the caller, newest first. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: getContacts
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Contacts of the caller
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contact'
+
+    post:
+      tags:
+        - Contacts
+      summary: Add a contact
+      description: Adds a user to the caller's contacts. Idempotent — adding an existing contact returns it without changes.
+      operationId: addContact
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContactAddRequest'
+      responses:
+        '200':
+          description: Contact added (or already existing)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contact'
         '400':
-          description: Invalid message
-        '401':
-          description: Unauthorized
+          description: Invalid username (self or malformed)
+
+  /api/contacts/{username}:
+    delete:
+      tags:
+        - Contacts
+      summary: Remove a contact
+      description: Removes a user from the caller's contacts. Idempotent — removing a non-existing contact succeeds.
+      operationId: removeContact
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '204':
+          description: Contact removed (or was not in contacts)
+
+  /api/conversations/{conversationId}/read:
+    post:
+      tags:
+        - Conversations
+      summary: Mark conversation as read
+      description: Marks all peer's messages of the conversation as read. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: markConversationRead
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: All peer's messages marked as read
+        '403':
+          description: Not a conversation member
+
+  /api/keys/me:
+    put:
+      tags:
+        - Keys
+      summary: Publish own public key
+      description: Creates or replaces the caller's E2E public key. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: publishMyKey
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PublicKeyUpsertRequest'
+      responses:
+        '200':
+          description: Published key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyInfo'
+
+    get:
+      tags:
+        - Keys
+      summary: Get own public key
+      description: Returns the caller's published key, 404 if not published yet.
+      operationId: getMyKey
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Own public key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyInfo'
+        '404':
+          description: Key not published yet
+
+  /api/keys/{username}:
+    get:
+      tags:
+        - Keys
+      summary: Get user's public key
+      description: Public key directory lookup — needed to start an encrypted conversation. The `verified` flag tells whether the caller has verified this exact key fingerprint.
+      operationId: getUserKey
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '200':
+          description: User's public key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicKeyInfo'
+        '404':
+          description: User has not published a key
+
+  /api/keys/{username}/verify:
+    put:
+      tags:
+        - Keys
+      summary: Verify user's key
+      description: Marks the user's key as verified by the caller. Verification binds to the fingerprint — key rotation invalidates it.
+      operationId: verifyUserKey
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeyVerifyRequest'
+      responses:
+        '200':
+          description: Verification saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerificationInfo'
+
+    delete:
+      tags:
+        - Keys
+      summary: Remove key verification
+      description: Removes the caller's verification of the user's key. Idempotent.
+      operationId: unverifyUserKey
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 3
+            maxLength: 64
+      responses:
+        '204':
+          description: Verification removed (or was not set)
+
+  /api/profiles/me:
+    get:
+      tags:
+        - Profiles
+      summary: Get own profile
+      description: Returns the caller's profile. Internal endpoint — the username comes from the X-Username header set by the gateway, never from the client.
+      operationId: getMyProfile
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Username extracted from JWT by the gateway
+      responses:
+        '200':
+          description: Profile (defaults if not yet created — displayName = username)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+
+    put:
+      tags:
+        - Profiles
+      summary: Create or update own profile
+      description: Upserts the caller's profile. Internal endpoint — the username comes from the X-Username header set by the gateway.
+      operationId: updateMyProfile
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Username extracted from JWT by the gateway
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: Saved profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          description: Invalid input
 
 components:
   schemas:
+    Conversation:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Conversation unique identifier
+          example: 550e8400-e29b-41d4-a716-446655440000
+        peer:
+          type: string
+          description: The other participant's username
+          example: alex123
+        displayName:
+          type: string
+          description: The other participant's display name (falls back to username if no profile)
+          example: Alex
+        createdAt:
+          type: string
+          format: date-time
+          description: Conversation creation time
+          example: 2024-01-15T10:30:00
+        lastMessage:
+          type: string
+          nullable: true
+          description: Text of the newest message (null if no messages yet)
+          example: Hello!
+        lastMessageAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Time of the newest message (null if no messages yet)
+          example: 2024-01-15T10:35:00
+        unreadCount:
+          type: integer
+          description: Number of unread messages from the peer
+          example: 3
+      description: 1-on-1 conversation
+
+    Contact:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Contact's username
+          example: alex123
+        displayName:
+          type: string
+          description: Contact's display name (falls back to username if no profile)
+          example: Alex
+        createdAt:
+          type: string
+          format: date-time
+          description: When the contact was added
+          example: 2024-01-15T10:30:00
+      description: Entry of the caller's contact list
+
+    ContactAddRequest:
+      type: object
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          description: Username to add to contacts
+          example: alex123
+      description: Contact addition request
+
+    PublicKeyInfo:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Key owner
+          example: alex123
+        publicKey:
+          type: string
+          description: Public identity key (base64)
+          example: MCowBQYDK2VuAyEA...
+        fingerprint:
+          type: string
+          description: Key fingerprint (sha256, base64url) — basis of the safety number
+          example: dB2fq81kOBo
+        createdAt:
+          type: string
+          format: date-time
+          description: When the key was first published
+          example: 2024-01-15T10:30:00
+        updatedAt:
+          type: string
+          format: date-time
+          description: When the key was last replaced
+          example: 2024-01-15T10:30:00
+        verified:
+          type: boolean
+          description: Whether the caller has verified this exact fingerprint
+          example: true
+      description: Published E2E public key
+
+    PublicKeyUpsertRequest:
+      type: object
+      required:
+        - publicKey
+        - fingerprint
+      properties:
+        publicKey:
+          type: string
+          minLength: 32
+          maxLength: 1024
+          description: Public identity key (base64)
+          example: MCowBQYDK2VuAyEA...
+        fingerprint:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: Key fingerprint (sha256, base64url) — computed on client
+          example: dB2fq81kOBo
+      description: Key publication request
+
+    KeyVerifyRequest:
+      type: object
+      required:
+        - fingerprint
+      properties:
+        fingerprint:
+          type: string
+          minLength: 8
+          maxLength: 64
+          description: Fingerprint the caller verified (from safety number comparison)
+          example: dB2fq81kOBo
+      description: Key verification request
+
+    VerificationInfo:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Whose key is verified
+          example: alex123
+        fingerprint:
+          type: string
+          description: Verified fingerprint
+          example: dB2fq81kOBo
+        verifiedAt:
+          type: string
+          format: date-time
+          description: When the verification was saved
+          example: 2024-01-15T10:30:00
+      description: Key verification record
+
+    ConversationCreateRequest:
+      type: object
+      required:
+        - username
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 64
+          description: Peer username — conversation partner
+          example: alex123
+      description: Conversation creation request
+
+    Profile:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Login (from JWT, immutable)
+          example: alex123
+        displayName:
+          type: string
+          description: Display name shown in chat
+          example: Alex
+        bio:
+          type: string
+          description: About me
+          example: Coffee and distributed systems
+      description: User profile
+
+    ProfileUpdateRequest:
+      type: object
+      required:
+        - displayName
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 64
+          description: Display name shown in chat
+          example: Alex
+        bio:
+          type: string
+          maxLength: 500
+          description: About me
+          example: Coffee and distributed systems
+      description: Profile update request
+
     Message:
       type: object
       properties:
@@ -77,7 +648,28 @@ components:
           format: date-time
           description: Message timestamp
           example: 2024-01-15T10:30:00
+        read:
+          type: boolean
+          description: Whether the peer has read the message
+          example: true
+        encrypted:
+          type: boolean
+          description: True if content is E2E ciphertext (base64) — server never sees plaintext
+          example: true
       description: Chat message
+
+    MessagesPage:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Message'
+        nextBeforeId:
+          type: string
+          nullable: true
+          description: Cursor for the next (older) page; null when history is exhausted
+      description: Page of chat messages (newest first)
 
     MessageRequest:
       type: object
@@ -86,10 +678,17 @@ components:
       properties:
         username:
           type: string
-          description: Sender username
+          description: Ignored — author is always taken from the JWT by the gateway
           example: alex123
         content:
           type: string
-          description: Message content
+          minLength: 1
+          maxLength: 4000
+          description: Message content, or base64 ciphertext when encrypted = true
           example: Hello, World!
+        encrypted:
+          type: boolean
+          default: false
+          description: True if content is E2E ciphertext (base64)
+          example: true
       description: Message creation request

@@ -6,8 +6,8 @@ import org.your.gossips.common.dto.AuthResponse;
 import org.your.gossips.common.security.JwtProperties;
 import org.your.gossips.common.security.JwtService;
 import org.your.gossips.gossipssecurity.adapter.out.persistence.RefreshTokenPersistence;
-import org.your.gossips.gossipssecurity.adapter.out.persistence.StoredRefreshToken;
-import org.your.gossips.gossipssecurity.adapter.out.persistence.StoredUser;
+import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredRefreshToken;
+import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredUser;
 import org.your.gossips.gossipssecurity.adapter.out.persistence.UserPersistence;
 import org.your.gossips.gossipssecurity.common.exception.InvalidRefreshTokenException;
 

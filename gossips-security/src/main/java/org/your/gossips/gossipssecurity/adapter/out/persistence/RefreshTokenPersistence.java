@@ -1,5 +1,7 @@
 package org.your.gossips.gossipssecurity.adapter.out.persistence;
 
+import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredRefreshToken;
+
 import java.util.Optional;
 
 /**

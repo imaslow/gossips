@@ -19,10 +19,49 @@ public final class ApiPaths {
         }
     }
 
-    public static final class Messages {
-        public static final String BASE = "/api/messages";
+    public static final class Conversations {
+        public static final String BASE = "/api/conversations";
+        public static final String MESSAGES = BASE + "/{conversationId}/messages";
+        public static final String READ = BASE + "/{conversationId}/read";
 
-        private Messages() {
+        private Conversations() {
+        }
+    }
+
+    /**
+     * WebSocket-эндпоинт realtime-доставки (только app-сервис).
+     * Токен передаётся query-параметром: /ws?token=eyJ...
+     */
+    public static final class Realtime {
+        public static final String WS = "/ws";
+
+        private Realtime() {
+        }
+    }
+
+    public static final class Keys {
+        public static final String BASE = "/api/keys";
+        public static final String ME = BASE + "/me";
+        public static final String USER = BASE + "/{username}";
+        public static final String VERIFY = USER + "/verify";
+
+        private Keys() {
+        }
+    }
+
+    public static final class Contacts {
+        public static final String BASE = "/api/contacts";
+        public static final String BY_USERNAME = BASE + "/{username}";
+
+        private Contacts() {
+        }
+    }
+
+    public static final class Profiles {
+        public static final String BASE = "/api/profiles";
+        public static final String ME = BASE + "/me";
+
+        private Profiles() {
         }
     }
 }

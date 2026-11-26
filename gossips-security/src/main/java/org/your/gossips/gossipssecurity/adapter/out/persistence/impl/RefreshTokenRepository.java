@@ -2,9 +2,10 @@ package org.your.gossips.gossipssecurity.adapter.out.persistence.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 import org.your.gossips.gossipssecurity.adapter.out.persistence.RefreshTokenPersistence;
-import org.your.gossips.gossipssecurity.adapter.out.persistence.StoredRefreshToken;
+import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredRefreshToken;
 import org.your.gossips.gossipssecurity.jooq.tables.records.RefreshTokensRecord;
 
 import java.util.Optional;
@@ -38,7 +39,7 @@ public class RefreshTokenRepository implements RefreshTokenPersistence {
     @Override
     public void revoke(UUID id) {
         dsl.update(REFRESH_TOKENS)
-                .set(REFRESH_TOKENS.REVOKED_AT, org.jooq.impl.DSL.currentOffsetDateTime())
+                .set(REFRESH_TOKENS.REVOKED_AT, DSL.currentOffsetDateTime())
                 .where(REFRESH_TOKENS.ID.eq(id))
                 .execute();
     }

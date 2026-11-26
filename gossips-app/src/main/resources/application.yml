@@ -10,3 +10,13 @@ spring:
     password: ${DB_PASSWORD:gossips}
   flyway:
     enabled: true
+
+gossips:
+  pagination:
+    default-limit: 50
+    max-limit: 100
+  security:
+    jwt:
+      # Тот же секрет, что в security — app проверяет токены WS-подключений.
+      # ОБЯЗАТЕЛЬНО переопределить через env JWT_SECRET в любом окружении выше локалки.
+      secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
