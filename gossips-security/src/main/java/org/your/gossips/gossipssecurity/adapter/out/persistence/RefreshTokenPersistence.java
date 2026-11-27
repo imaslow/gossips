@@ -1,8 +1,9 @@
 package org.your.gossips.gossipssecurity.adapter.out.persistence;
 
-import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredRefreshToken;
+import org.your.gossips.gossipssecurity.adapter.out.model.StoredRefreshToken;
 
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Порт для доступа к хранилищу refresh-токенов.
@@ -19,5 +20,5 @@ public interface RefreshTokenPersistence {
     /**
      * Отзывает токен (проставляет {@code revoked_at}).
      */
-    void revoke(java.util.UUID id);
+    void revoke(UUID id);
 }

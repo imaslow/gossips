@@ -123,6 +123,76 @@ paths:
         '503':
           description: App service unavailable
 
+  /api/conversations/group:
+    post:
+      tags:
+        - GatewayAuth
+      summary: Create a group conversation
+      description: Creates a group chat with the given members. The caller is added as a member and becomes the creator.
+      operationId: gatewayCreateGroupConversation
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationGroupCreateRequest'
+      responses:
+        '200':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Invalid members or title
+        '401':
+          description: Invalid or missing token
+        '503':
+          description: App service unavailable
+
+  /api/conversations/{conversationId}/members:
+    get:
+      tags:
+        - GatewayAuth
+      summary: List conversation members
+      description: All members with display names. Only conversation members.
+      operationId: gatewayGetConversationMembers
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: JWT token
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationMember'
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Not a conversation member
+        '503':
+          description: App service unavailable
+
   /api/conversations/{conversationId}/messages:
     get:
       tags:
@@ -234,6 +304,36 @@ paths:
       responses:
         '204':
           description: All peer's messages marked as read
+        '401':
+          description: Invalid or missing token
+        '403':
+          description: Not a conversation member
+        '503':
+          description: App service unavailable
+
+  /api/conversations/{conversationId}/typing:
+    post:
+      tags:
+        - GatewayAuth
+      summary: Signal that the caller is typing
+      description: Ephemeral signal — other members get a TYPING WebSocket event, nothing is persisted
+      operationId: gatewaySignalTyping
+      parameters:
+        - name: Authorization
+          in: header
+          required: false
+          schema:
+            type: string
+          description: JWT token
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Signal broadcast to other members
         '401':
           description: Invalid or missing token
         '403':
@@ -817,13 +917,25 @@ components:
           format: uuid
           description: Conversation unique identifier
           example: 550e8400-e29b-41d4-a716-446655440000
+        type:
+          type: string
+          enum: [pair, group]
+          description: Conversation kind — "pair" is 1-on-1, "group" is a group chat
+          example: pair
+        title:
+          type: string
+          nullable: true
+          description: Group title (null for pair conversations)
+          example: Weekend hikers
         peer:
           type: string
-          description: The other conversation member's username
+          nullable: true
+          description: The other conversation member's username (null for group conversations)
           example: alex123
         displayName:
           type: string
-          description: The other participant's display name (falls back to username if no profile)
+          nullable: true
+          description: The other participant's display name (falls back to username if no profile; null for groups)
           example: Alex
         createdAt:
           type: string
@@ -841,9 +953,13 @@ components:
           nullable: true
           description: Time of the newest message (null if no messages yet)
           example: 2024-01-15T10:35:00
+        lastMessageEncrypted:
+          type: boolean
+          description: Whether the newest message is E2E-encrypted (ciphertext, not display text)
+          example: true
         unreadCount:
           type: integer
-          description: Number of unread messages from the peer
+          description: Number of unread messages from other members
           example: 3
 
     ConversationCreateRequest:
@@ -857,6 +973,40 @@ components:
           maxLength: 64
           description: Username of the user to start a conversation with
           example: alex123
+
+    ConversationGroupCreateRequest:
+      type: object
+      required:
+        - usernames
+        - title
+      properties:
+        usernames:
+          type: array
+          minItems: 2
+          items:
+            type: string
+            minLength: 3
+            maxLength: 64
+          description: Group members besides the caller (the caller is added automatically)
+          example: [alex123, sam456]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Group title
+          example: Weekend hikers
+
+    ConversationMember:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Member login
+          example: alex123
+        displayName:
+          type: string
+          description: Member's display name (falls back to username if no profile)
+          example: Alex
 
     MessagesPage:
       type: object

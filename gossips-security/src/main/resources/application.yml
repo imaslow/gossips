@@ -22,3 +22,19 @@ gossips:
       access-expiration: ${JWT_ACCESS_EXPIRATION:15m}
       # Время жизни refresh-токена (в БД, отзываемый)
       refresh-expiration: ${JWT_REFRESH_EXPIRATION:7d}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # liveness/readiness группы — для compose и будущего k8s
+      probes:
+        enabled: true
+
+logging:
+  # requestId проставляет RequestIdFilter из common (MDC), см. LoggingConfig
+  pattern:
+    level: "%5p [requestId=%X{requestId}]"

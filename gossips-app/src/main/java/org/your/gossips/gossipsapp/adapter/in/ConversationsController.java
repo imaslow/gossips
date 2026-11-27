@@ -5,6 +5,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 import org.your.gossips.common.dto.Conversation;
 import org.your.gossips.common.dto.ConversationCreateRequest;
+import org.your.gossips.common.dto.ConversationGroupCreateRequest;
+import org.your.gossips.common.dto.ConversationMember;
 import org.your.gossips.common.dto.Message;
 import org.your.gossips.common.dto.MessageRequest;
 import org.your.gossips.common.dto.MessagesPage;
@@ -23,6 +25,18 @@ public class ConversationsController implements ConversationsApi {
     @Override
     public ResponseEntity<Conversation> createConversation(String xUsername, ConversationCreateRequest conversationCreateRequest) {
         return ResponseEntity.ok(conversationService.create(xUsername, conversationCreateRequest.getUsername()));
+    }
+
+    @Override
+    public ResponseEntity<Conversation> createGroupConversation(String xUsername,
+                                                              ConversationGroupCreateRequest conversationGroupCreateRequest) {
+        return ResponseEntity.ok(conversationService.createGroup(
+                xUsername, conversationGroupCreateRequest.getUsernames(), conversationGroupCreateRequest.getTitle()));
+    }
+
+    @Override
+    public ResponseEntity<List<ConversationMember>> getConversationMembers(String xUsername, UUID conversationId) {
+        return ResponseEntity.ok(conversationService.getMembers(xUsername, conversationId));
     }
 
     @Override
@@ -45,6 +59,12 @@ public class ConversationsController implements ConversationsApi {
     @Override
     public ResponseEntity<Void> markConversationRead(String xUsername, UUID conversationId) {
         conversationService.markRead(xUsername, conversationId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Override
+    public ResponseEntity<Void> signalTyping(String xUsername, UUID conversationId) {
+        conversationService.signalTyping(xUsername, conversationId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -3,6 +3,7 @@ package org.your.gossips.gossipsapp.service.impl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.your.gossips.common.dto.Conversation;
+import org.your.gossips.common.dto.ConversationMember;
 import org.your.gossips.common.dto.Message;
 import org.your.gossips.common.dto.MessagesPage;
 import org.your.gossips.gossipsapp.adapter.out.model.ConversationSummary;
@@ -20,6 +21,8 @@ import org.your.gossips.gossipsapp.mapper.ConversationMapper;
 import org.your.gossips.gossipsapp.mapper.MessageMapper;
 import org.your.gossips.gossipsapp.service.ConversationService;
 
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,10 +47,51 @@ public class ConversationServiceImpl implements ConversationService {
         }
         StoredConversation conversation = conversationPersistence.findByPair(username, peer)
                 .orElseGet(() -> conversationPersistence.createForPair(username, peer));
+        // Собеседник узнаёт о новом диалоге только через realtime — иначе у него
+        // переписка появится после reload или первого сообщения
+        for (String member : conversationPersistence.findMemberUsernames(conversation.id())) {
+            if (!member.equals(username)) {
+                pushNotifier.pushConversationUpdated(member, conversation.id());
+            }
+        }
         // lastMessage/unreadCount не заполняем: ответ create — про идентификатор диалога,
         // сводки с историей клиент получает списком
         return conversationMapper.toDto(new ConversationSummary(
-                conversation.id(), peer, displayNameOf(peer), conversation.createdAt(), null, null, 0));
+                conversation.id(), peer, displayNameOf(peer), conversation.type(), conversation.title(),
+                conversation.createdAt(), null, null, false, 0));
+    }
+
+    @Override
+    public Conversation createGroup(String username, List<String> usernames, String title) {
+        // Свойство множества + сохранение порядка: дедупликация без сюрпризов в списке участников
+        List<String> others = new ArrayList<>(new LinkedHashSet<>(usernames));
+        if (others.contains(username)) {
+            throw new IllegalArgumentException("creator must not be in the member list");
+        }
+        if (others.size() < 2) {
+            throw new IllegalArgumentException("group requires at least 2 members besides the creator");
+        }
+        List<String> members = new ArrayList<>();
+        members.add(username);
+        members.addAll(others);
+        StoredConversation conversation = conversationPersistence.createGroup(username, members, title);
+        // Остальные участники узнают о беседе через realtime
+        for (String member : conversationPersistence.findMemberUsernames(conversation.id())) {
+            if (!member.equals(username)) {
+                pushNotifier.pushConversationUpdated(member, conversation.id());
+            }
+        }
+        return conversationMapper.toDto(new ConversationSummary(
+                conversation.id(), null, null, conversation.type(), conversation.title(),
+                conversation.createdAt(), null, null, false, 0));
+    }
+
+    @Override
+    public List<ConversationMember> getMembers(String username, UUID conversationId) {
+        requireMember(conversationId, username);
+        return conversationPersistence.findMemberSummaries(conversationId).stream()
+                .map(conversationMapper::toDto)
+                .toList();
     }
 
     @Override
@@ -87,6 +131,22 @@ public class ConversationServiceImpl implements ConversationService {
     public void markRead(String username, UUID conversationId) {
         requireMember(conversationId, username);
         messagePersistence.markRead(conversationId, username);
+        // Авторы сообщений обновляют статусы «прочитано» без перезахода
+        for (String member : conversationPersistence.findMemberUsernames(conversationId)) {
+            if (!member.equals(username)) {
+                pushNotifier.pushRead(member, conversationId, username);
+            }
+        }
+    }
+
+    @Override
+    public void signalTyping(String username, UUID conversationId) {
+        requireMember(conversationId, username);
+        for (String member : conversationPersistence.findMemberUsernames(conversationId)) {
+            if (!member.equals(username)) {
+                pushNotifier.pushTyping(member, conversationId, username);
+            }
+        }
     }
 
     private void requireMember(UUID conversationId, String username) {

@@ -9,6 +9,8 @@ import org.your.gossips.common.dto.Contact;
 import org.your.gossips.common.dto.ContactAddRequest;
 import org.your.gossips.common.dto.Conversation;
 import org.your.gossips.common.dto.ConversationCreateRequest;
+import org.your.gossips.common.dto.ConversationGroupCreateRequest;
+import org.your.gossips.common.dto.ConversationMember;
 import org.your.gossips.common.dto.Message;
 import org.your.gossips.common.dto.MessageRequest;
 import org.your.gossips.common.dto.MessagesPage;
@@ -57,6 +59,15 @@ public class AppServiceClient {
                 .body(Conversation.class));
     }
 
+    public Conversation createGroupConversation(String username, ConversationGroupCreateRequest request) {
+        return execute(() -> appRestClient.post()
+                .uri(ApiPaths.Conversations.GROUP)
+                .header("X-Username", username)
+                .body(request)
+                .retrieve()
+                .body(Conversation.class));
+    }
+
     public List<Conversation> getConversations(String username) {
         return execute(() -> {
             Conversation[] conversations = appRestClient.get()
@@ -65,6 +76,17 @@ public class AppServiceClient {
                     .retrieve()
                     .body(Conversation[].class);
             return conversations == null ? List.of() : Arrays.asList(conversations);
+        });
+    }
+
+    public List<ConversationMember> getConversationMembers(String username, UUID conversationId) {
+        return execute(() -> {
+            ConversationMember[] members = appRestClient.get()
+                    .uri(ApiPaths.Conversations.MEMBERS, conversationId)
+                    .header("X-Username", username)
+                    .retrieve()
+                    .body(ConversationMember[].class);
+            return members == null ? List.of() : Arrays.asList(members);
         });
     }
 
@@ -125,6 +147,14 @@ public class AppServiceClient {
     public void markConversationRead(String username, UUID conversationId) {
         execute(() -> appRestClient.post()
                 .uri(ApiPaths.Conversations.READ, conversationId)
+                .header("X-Username", username)
+                .retrieve()
+                .toBodilessEntity());
+    }
+
+    public void signalTyping(String username, UUID conversationId) {
+        execute(() -> appRestClient.post()
+                .uri(ApiPaths.Conversations.TYPING, conversationId)
                 .header("X-Username", username)
                 .retrieve()
                 .toBodilessEntity());

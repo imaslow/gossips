@@ -63,6 +63,66 @@ paths:
                 items:
                   $ref: '#/components/schemas/Conversation'
 
+  /api/conversations/group:
+    post:
+      tags:
+        - Conversations
+      summary: Create a group conversation
+      description: Creates a group chat with the given members. The caller is added as a member and becomes the creator. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: createGroupConversation
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationGroupCreateRequest'
+      responses:
+        '200':
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Conversation'
+        '400':
+          description: Invalid members or title
+
+  /api/conversations/{conversationId}/members:
+    get:
+      tags:
+        - Conversations
+      summary: List conversation members
+      description: All members with display names. Only conversation members. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: getConversationMembers
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Conversation members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ConversationMember'
+        '403':
+          description: Not a conversation member
+
   /api/conversations/{conversationId}/messages:
     get:
       tags:
@@ -214,6 +274,31 @@ paths:
       responses:
         '204':
           description: Contact removed (or was not in contacts)
+
+  /api/conversations/{conversationId}/typing:
+    post:
+      tags:
+        - Conversations
+      summary: Signal that the caller is typing
+      description: Ephemeral signal — other members get a TYPING WebSocket event, nothing is persisted. Internal endpoint — caller comes from the X-Username header set by the gateway.
+      operationId: signalTyping
+      parameters:
+        - name: X-Username
+          in: header
+          required: true
+          schema:
+            type: string
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Signal broadcast to other members
+        '403':
+          description: Not a conversation member
 
   /api/conversations/{conversationId}/read:
     post:
@@ -437,13 +522,25 @@ components:
           format: uuid
           description: Conversation unique identifier
           example: 550e8400-e29b-41d4-a716-446655440000
+        type:
+          type: string
+          enum: [pair, group]
+          description: Conversation kind — "pair" is 1-on-1, "group" is a group chat
+          example: pair
+        title:
+          type: string
+          nullable: true
+          description: Group title (null for pair conversations)
+          example: Weekend hikers
         peer:
           type: string
-          description: The other participant's username
+          nullable: true
+          description: The other participant's username (null for group conversations)
           example: alex123
         displayName:
           type: string
-          description: The other participant's display name (falls back to username if no profile)
+          nullable: true
+          description: The other participant's display name (falls back to username if no profile; null for groups)
           example: Alex
         createdAt:
           type: string
@@ -461,11 +558,15 @@ components:
           nullable: true
           description: Time of the newest message (null if no messages yet)
           example: 2024-01-15T10:35:00
+        lastMessageEncrypted:
+          type: boolean
+          description: Whether the newest message is E2E-encrypted (ciphertext, not display text)
+          example: true
         unreadCount:
           type: integer
-          description: Number of unread messages from the peer
+          description: Number of unread messages from other members
           example: 3
-      description: 1-on-1 conversation
+      description: 1-on-1 or group conversation
 
     Contact:
       type: object
@@ -592,6 +693,42 @@ components:
           description: Peer username — conversation partner
           example: alex123
       description: Conversation creation request
+
+    ConversationGroupCreateRequest:
+      type: object
+      required:
+        - usernames
+        - title
+      properties:
+        usernames:
+          type: array
+          minItems: 2
+          items:
+            type: string
+            minLength: 3
+            maxLength: 64
+          description: Group members besides the caller (the caller is added automatically)
+          example: [alex123, sam456]
+        title:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Group title
+          example: Weekend hikers
+      description: Group conversation creation request
+
+    ConversationMember:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Member login
+          example: alex123
+        displayName:
+          type: string
+          description: Member's display name (falls back to username if no profile)
+          example: Alex
+      description: Conversation member with display name
 
     Profile:
       type: object

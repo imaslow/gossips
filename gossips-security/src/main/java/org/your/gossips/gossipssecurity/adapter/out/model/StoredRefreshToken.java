@@ -1,4 +1,4 @@
-package org.your.gossips.gossipssecurity.adapter.out.persistence.model;
+package org.your.gossips.gossipssecurity.adapter.out.model;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

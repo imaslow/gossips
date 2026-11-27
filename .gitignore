@@ -1,4 +1,6 @@
 HELP.md
+# Liquibase 5 офлайн-кодоген (security) перегенирирует историю на каждую сборку
+databasechangelog.csv
 target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

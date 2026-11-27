@@ -20,3 +20,19 @@ gossips:
       # Тот же секрет, что в security — app проверяет токены WS-подключений.
       # ОБЯЗАТЕЛЬНО переопределить через env JWT_SECRET в любом окружении выше локалки.
       secret: ${JWT_SECRET:dev-only-secret-change-me-0123456789abcdef}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      # liveness/readiness группы — для compose и будущего k8s
+      probes:
+        enabled: true
+
+logging:
+  # requestId проставляет RequestIdFilter из common (MDC), см. LoggingConfig
+  pattern:
+    level: "%5p [requestId=%X{requestId}]"

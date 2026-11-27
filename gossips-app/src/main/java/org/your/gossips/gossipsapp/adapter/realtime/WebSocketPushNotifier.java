@@ -28,6 +28,32 @@ public class WebSocketPushNotifier implements PushNotifier {
         registry.sendToUser(username, envelope);
     }
 
+    @Override
+    public void pushConversationUpdated(String username, UUID conversationId) {
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("type", "CONVERSATION_UPDATED");
+        envelope.put("conversationId", conversationId.toString());
+        registry.sendToUser(username, envelope);
+    }
+
+    @Override
+    public void pushTyping(String toUsername, UUID conversationId, String typingUsername) {
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("type", "TYPING");
+        envelope.put("conversationId", conversationId.toString());
+        envelope.put("username", typingUsername);
+        registry.sendToUser(toUsername, envelope);
+    }
+
+    @Override
+    public void pushRead(String toUsername, UUID conversationId, String readUsername) {
+        Map<String, Object> envelope = new LinkedHashMap<>();
+        envelope.put("type", "MESSAGES_READ");
+        envelope.put("conversationId", conversationId.toString());
+        envelope.put("username", readUsername);
+        registry.sendToUser(toUsername, envelope);
+    }
+
     private Map<String, Object> toPayload(Message message) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("id", message.getId());

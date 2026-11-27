@@ -7,7 +7,6 @@ import org.your.gossips.gossipsapp.adapter.out.model.StoredKey;
 import org.your.gossips.gossipsapp.adapter.out.model.StoredKeyVerification;
 import org.your.gossips.gossipsapp.adapter.out.persistence.KeyPersistence;
 import org.your.gossips.gossipsapp.jooq.tables.records.KeyVerificationsRecord;
-import org.your.gossips.gossipsapp.jooq.tables.records.UserKeysRecord;
 
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -23,22 +22,17 @@ public class KeyRepository implements KeyPersistence {
 
     @Override
     public StoredKey upsert(StoredKey key) {
-        Optional<UserKeysRecord> existing = dsl.selectFrom(USER_KEYS)
-                .where(USER_KEYS.USERNAME.eq(key.username()))
-                .fetchOptional();
-        if (existing.isPresent()) {
-            return dsl.update(USER_KEYS)
-                    .set(USER_KEYS.PUBLIC_KEY, key.publicKey())
-                    .set(USER_KEYS.FINGERPRINT, key.fingerprint())
-                    .set(USER_KEYS.UPDATED_AT, OffsetDateTime.now())
-                    .where(USER_KEYS.USERNAME.eq(key.username()))
-                    .returning()
-                    .fetchOneInto(StoredKey.class);
-        }
+        // Атомарный upsert: «select, затем insert/update» даёт гонку при параллельных
+        // запросах (два insert с одним username -> duplicate key).
         return dsl.insertInto(USER_KEYS)
                 .set(USER_KEYS.USERNAME, key.username())
                 .set(USER_KEYS.PUBLIC_KEY, key.publicKey())
                 .set(USER_KEYS.FINGERPRINT, key.fingerprint())
+                .onConflict(USER_KEYS.USERNAME)
+                .doUpdate()
+                .set(USER_KEYS.PUBLIC_KEY, key.publicKey())
+                .set(USER_KEYS.FINGERPRINT, key.fingerprint())
+                .set(USER_KEYS.UPDATED_AT, OffsetDateTime.now())
                 .returning()
                 .fetchOneInto(StoredKey.class);
     }

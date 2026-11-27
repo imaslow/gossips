@@ -21,8 +21,11 @@ public final class ApiPaths {
 
     public static final class Conversations {
         public static final String BASE = "/api/conversations";
+        public static final String GROUP = BASE + "/group";
         public static final String MESSAGES = BASE + "/{conversationId}/messages";
+        public static final String MEMBERS = BASE + "/{conversationId}/members";
         public static final String READ = BASE + "/{conversationId}/read";
+        public static final String TYPING = BASE + "/{conversationId}/typing";
 
         private Conversations() {
         }

@@ -11,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.your.gossips.common.logging.LoggingConfig;
 import org.your.gossips.common.security.JwtProperties;
 import org.your.gossips.common.security.JwtService;
 
@@ -18,7 +19,7 @@ import org.your.gossips.common.security.JwtService;
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtProperties.class)
 // common не входит в component-scan security — подключаем явно
-@Import(JwtService.class)
+@Import({JwtService.class, LoggingConfig.class})
 public class SecurityConfig {
 
     @Bean

@@ -59,7 +59,23 @@ exception/             доменные исключения (AccessDeniedExcept
 - Нормализация — статический `PaginationUtils.normalizeLimit(limit, default, max)`.
 - Курсор — позиция `(created_at, id)` с двойным ключом (снимает коллизии timestamp'ов); в ответе `nextBeforeId`, null = история кончилась.
 
-### 2.6 Данные: две БД, две миграционные системы
+### 2.6 Сквозной идентификатор запроса (X-Request-Id)
+
+`RequestIdFilter` (common, `logging/`) читает заголовок `X-Request-Id` или генерирует UUID,
+кладёт в MDC (`requestId`) и возвращает в ответе; паттерн логов всех сервисов
+(`logging.pattern.level: "%5p [requestId=%X{requestId}]"`) печатает его в каждой строке.
+Gateway дополнительно прокидывает заголовок в security/app через интерсептор
+`RestClientConfig` — цепочка «gateway → внутренний сервис» связывается одним id в логах.
+Фильтр регистрируется `LoggingConfig` и подключается `@Import` в каждом сервисе
+(common не входит в component-scan).
+
+### 2.7 Наблюдаемость
+
+Actuator у всех сервисов: наружу открыт только `/actuator/health`,
+включены probes (`/actuator/health/liveness`, `/actuator/health/readiness`) —
+compose-файл гоняет их в healthcheck'ах, оттуда же возьмёт k8s, если понадобится.
+
+### 2.8 Данные: две БД, две миграционные системы
 | БД | Сервис | Миграции | Таблицы |
 |---|---|---|---|
 | `gossips` | security | **Liquibase** (xml-чейнджсеты + sql-скрипты) | users, refresh_tokens |
@@ -101,7 +117,13 @@ JWT никогда не уходит за gateway — внутри класте�
 3. GET /api/conversations/{id}/messages?beforeId&limit — история, курсорно
 4. POST /api/conversations/{id}/read — помечает чужие непрочитанные read_at=now
 ```
-Список диалогов (`GET /api/conversations`) — это «главная страница»: peer, displayName, **lastMessage/lastMessageAt, unreadCount**, сортировка по активности. Пустых «глобальных» чатов нет — каждое сообщение принадлежит диалогу (V5, NOT NULL).
+Список диалогов (`GET /api/conversations`) — это «главная страница»: type, title (для групп), peer/displayName (только для pair), **lastMessage/lastMessageAt, unreadCount**, сортировка по активности. Пустых «глобальных» чатов нет — каждое сообщение принадлежит диалогу (V5, NOT NULL).
+
+Групповые беседы (V6: `conversations.type` pair/group, `title`, `created_by`; участники — те же `conversation_members`):
+- `POST /api/conversations/group` {usernames ≥ 2 (без создателя), title} → создатель добавляется первым, всем остальным летит CONVERSATION_UPDATED.
+- `GET /api/conversations/{id}/members` → участники с displayName (нужны клиенту для шифрования на каждый ключ).
+- unread/read/typing/realtime работают для N участников без изменений — рассылка всегда шла по `conversation_members`.
+- findByPair фильтрует `type='pair'`, поэтому группа, где состоят оба пользователя, pair-диалог не перехватывает.
 
 ### 3.4 Realtime (WebSocket, app:8082)
 ```
@@ -109,12 +131,38 @@ ws://app:8082/ws?token=<JWT>
   → isTokenValid? нет -> close 4401
   → да: username → WebSocketSessionRegistry (username → множество сессий/устройств)
 push: {"type":"NEW_MESSAGE","conversationId":"...","message":{...}}
+push: {"type":"CONVERSATION_UPDATED","conversationId":"..."}   // собеседник создал диалог
+push: {"type":"TYPING","conversationId":"...","username":"..."} // эфемерно, ничего не хранится
+push: {"type":"MESSAGES_READ","conversationId":"...","username":"..."} // участник прочитал диалог
 ```
+
+Typing: `POST /api/conversations/{id}/typing` (204) → broadcast остальным участникам как TYPING.
+Ничего не персистится; клиент шлёт с throttle (3 с) и показывает «печатает…» 3,5 с.
+
+MESSAGES_READ: `ConversationService.markRead` после апдейта статусов рассылает остальным
+участникам — клиент ставит ✓✓ своим сообщениям живьём, без перезахода в диалог.
 Канал односторонний (server→client): отправка сообщений — по HTTP (та же валидация), WS — чисто доставка. Мёртвые сессии вычищаются при отправке.
+
+Клиент (`gossips-web/src/lib/realtime.ts`): reconnect с нарастающей паузой (1→13 с),
+при reconnect токен заново берётся из `getValidAccessToken` (молчаливая ротация
+refresh через `/api/auth/refresh`, single-flight) — протухший access не рвёт канал.
+`NEW_MESSAGE` для активного чата — расшифровка и markRead на лету, для неактивного —
+бейдж unread + превью (для E2E-сообщений — заглушка «🔒», флаг `lastMessageEncrypted`
+в сводке). `CONVERSATION_UPDATED` — полный рефетч сводок. Пуш уходит всем участникам,
+кроме автора (у автора сообщение уже на экране локальным эхом).
 
 ### 3.5 Профили и контакты
 - `GET/PUT /api/profiles/me` — displayName (по умолчанию = логин), bio. displayName подставляется в списки диалогов/контактов (LEFT JOIN + coalesce к логину).
 - `GET/POST /api/contacts`, `DELETE /api/contacts/{username}` — ростер, идемпотентно.
+
+Клиент: вкладки «Чаты»/«Контакты» в сайдбаре, профиль — клик по своей плашке внизу.
+Верификация ключей — иконка в шапке чата: диалог сверки отпечатков (группы по 6),
+`PUT/DELETE /api/keys/{username}/verify`; verified привязан к fingerprint (rotation ключа сбрасывает).
+
+Группы на клиенте: диалог «+» с переключателем Диалог/Группа (название + мультивыбор из
+контактов, минимум 2). Шапка группы — название и подзаголовок со списком участников;
+чужие сообщения подписаны автором (displayName из /members). Цветные аватарки —
+детерминированный HSL из хэша имени (`lib/avatar.ts`).
 
 ### 3.6 E2E-инфраструктура
 ```
@@ -126,7 +174,19 @@ DELETE /api/keys/{username}/verify     снять верификацию (иде
 - Приватные ключи на сервер не попадают никогда.
 - Сообщение с `encrypted: true` — `content` это base64-ciphertext: сервер хранит/пересылает, не видя plaintext.
 - Верификация привязана к отпечатку: rotation ключа собеседником делает старую верификацию недействительной.
-- Криптография (X25519, ECDH, шифр, safety number) живёт на клиенте — API для неё готов.
+- Криптография живёт на клиенте (`gossips-web/src/lib/crypto.ts`): identity-пара ECDH P-256
+  (приватный ключ неизвлекаем, IndexedDB), сообщение — AES-GCM с эфемерной парой
+  (forward secrecy), две копии шифротекста: `toPeer` (для собеседника) и `toSelf`
+  (автор читает историю после перезахода). Safety number — fingerprint публичного ключа.
+- Форматы шифроконтейнера (в content при `encrypted: true`, base64(JSON)):
+  - **v=1 (pair)**: `{v, eph, toPeer:{iv,ct}, toSelf:{iv,ct}}` — получатель выбирает копию
+    по тому, своё сообщение или нет.
+  - **v=2 (group)**: `{v, eph, iv, ct, keys: {username: {iv, ct}}}` — тело зашифровано ОДИН раз
+    на случайный сеансовый ключ MK (32 байта, AES-GCM); MK зашит отдельно на публичный ключ
+    каждого участника (включая автора) через тот же ECDH с эфемерной парой. Клиент при открытии
+    группы тянет `/members` + `/api/keys/{username}` каждого: если у кого-то нет ключа —
+    отправка заблокирована, показан список таких участников. Расшифровка: `keys[мой логин]`
+    → MK → тело.
 
 ## 4. Конфигурация
 
@@ -152,6 +212,11 @@ DB_URL=jdbc:postgresql://localhost:5434/gossips_app  java -jar gossips-app/targe
 java -jar gossips-gateway/target/gossips-gateway-1.0.0.jar
 
 ./mvnw clean install    # сборка + тесты всех модулей
+
+# Здоровье сервисов (compose ждёт эти же эндпоинты в healthcheck'ах):
+curl localhost:8080/actuator/health   # gateway
+curl localhost:8081/actuator/health   # security
+curl localhost:8082/actuator/health   # app
 ```
 
 Клиенту нужны: gateway :8080 (HTTP) и app :8082 (WebSocket). Порты в компоузе проброшены как у локального контейнера разработки.
@@ -167,6 +232,18 @@ java -jar gossips-gateway/target/gossips-gateway-1.0.0.jar
 7. ДТО-модели не писать руками — они генерируются в common из спеки.
 8. Мапперы — MapStruct (`@Mapper(componentModel = "spring")`), сложные поля — `@Mapping(expression=...)`; мапперы лежат в `mapper/` на уровне модуля.
 9. Тесты зелёные (`./mvnw clean install`), фича проверена живьём на поднятом стеке.
+
+### 6.1 Тесты
+
+- `*Tests` в `src/test/.../it/` — интеграционные на Testcontainers: `PostgresIT` поднимает
+  `postgres:17-alpine` в Docker (singleton на JVM, параметры подключения —
+  через `@DynamicPropertySource`), Flyway/Liquibase накатывают миграции на чистую БД.
+  Классы с суффиксом `IT` surefire не подхватывает — именуем `*Tests`.
+- Unit-заглушки без БД (`GossipsAppApplicationTests` и т.п.) — контекст с исключённым
+  DataSource + `@MockitoBean` на `DSLContext`; живую БД они не трогают.
+- Тесты всех классов делят одну БД на JVM — у каждого теста свои уникальные юзернеймы.
+- CI: `.github/workflows/ci.yml` гоняет `./mvnw clean install` на каждый push/PR
+  (на runner'ах GitHub Actions Docker есть, Testcontainers работает из коробки).
 
 ## 7. Что дальше (горизонт)
 

@@ -5,7 +5,7 @@ import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.springframework.stereotype.Repository;
 import org.your.gossips.gossipssecurity.adapter.out.persistence.RefreshTokenPersistence;
-import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredRefreshToken;
+import org.your.gossips.gossipssecurity.adapter.out.model.StoredRefreshToken;
 import org.your.gossips.gossipssecurity.jooq.tables.records.RefreshTokensRecord;
 
 import java.util.Optional;

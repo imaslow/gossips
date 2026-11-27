@@ -66,6 +66,6 @@ public class RealtimeSocketHandler extends TextWebSocketHandler {
         }
         Map<String, List<String>> params = UriComponentsBuilder.fromUri(uri).build().getQueryParams();
         List<String> tokens = params.get("token");
-        return tokens == null || tokens.isEmpty() ? null : tokens.get(0);
+        return tokens == null || tokens.isEmpty() ? null : tokens.getFirst();
     }
 }

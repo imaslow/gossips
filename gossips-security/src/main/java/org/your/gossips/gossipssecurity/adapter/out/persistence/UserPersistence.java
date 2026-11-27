@@ -1,6 +1,6 @@
 package org.your.gossips.gossipssecurity.adapter.out.persistence;
 
-import org.your.gossips.gossipssecurity.adapter.out.persistence.model.StoredUser;
+import org.your.gossips.gossipssecurity.adapter.out.model.StoredUser;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -11,12 +11,6 @@ import java.util.UUID;
  */
 public interface UserPersistence {
 
-    /**
-     * Ищет пользователя по логину.
-     *
-     * @param username логин
-     * @return пользователь или {@link Optional#empty()}, если не найден
-     */
     /**
      * Ищет пользователя по идентификатору.
      *
